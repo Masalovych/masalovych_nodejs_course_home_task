@@ -1,10 +1,12 @@
-const log = function (...args) { console.log(...args); };
-const debug = function (...args) { console.debug(...args); };
-const error = function (...args) { console.error(...args); };
-const warn = function (...args) { console.warn(...args); };
+const logger = require('pino')();
+
+const info = function (...args) { logger.info(...args); };
+const debug = function (...args) { logger.debug(...args); };
+const error = function (...args) { logger.error(...args); };
+const warn = function (...args) { logger.warn(...args); };
 
 module.exports = {
-  log,
+  info,
   debug,
   error,
   warn

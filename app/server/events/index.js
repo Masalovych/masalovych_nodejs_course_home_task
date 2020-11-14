@@ -1,77 +1,50 @@
 const stream = require('stream');
-const fs = require('fs');
-const path = require('path');
-const csv = require('csv-parser');
-
-const dataFilePath = path.join(__dirname, '..', '..', 'data', 'events.csv');
-const dataHeaders = ['id', 'title', 'location', 'date', 'hour'];
-
-function getAllEvents(normalized) {
-  let events = [];
-  return new Promise((resolve) => {
-    fs.createReadStream(dataFilePath)
-      .pipe(csv(dataHeaders))
-      .on('data', data => events.push(data))
-      .on('end', () => {
-        if (normalized) {
-          events = events.reduce((memo, event) => {
-            memo[event.id] = event;
-            return memo;
-          }, {});
-        }
-        resolve(events);
-      });
-  });
-}
-
-function convertEventsToCsv(events) {
-  return events.reduce((memo, event) => {
-    memo += `${[event.id, event.title, event.location, event.date, event.hour].join(',')}\n`;
-    return memo;
-  }, '')
-}
-
-function saveEventsToFile(events) {
-  fs.writeFileSync(dataFilePath, convertEventsToCsv(events));
-}
-
-// Handlers
+const {getAllEvents, saveEventsToFile} = require('../helpers/csvDataHandlers');
+const asyncHooks = require('../hooks');
+const logger = require('../helpers/logger');
 
 // curl localhost:3000/events?location=lviv
-async function getEvents (req, res) {
-  const location = req.query.location;
-  getAllEvents().then(events => {
+async function getEvents (req, res, next) {
+  try {
+    const location = req.query.location;
+    let events = await getAllEvents();
+
+    logger.info(asyncHooks.getRequestContext(), req.query);
     if (location) {
       events = events.filter(event => event.location === location);
     }
     res.json(events);
-  });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // curl localhost:3000/events/2
-async function getEvent (req, res) {
-  const eventId = Number(req.params.eventId);
-  if (Number.isInteger(eventId)) {
-    getAllEvents(true).then(events => {
-      res.json(events[eventId]);
-    });
-  } else {
-    res.json({error: 'invalid param'});
+async function getEvent (req, res, next) {
+  try {
+    const eventId = Number(req.params.eventId);
+    logger.info(asyncHooks.getRequestContext(), req.params);
+
+    const events = await getAllEvents(true)
+    res.json(events[eventId]);
+  } catch (err) {
+    next(err);
   }
 }
 
 //  curl --request DELETE http://localhost:3000/events/3
-async function deleteEvent (req, res) {
-  const eventId = Number(req.params.eventId);
+async function deleteEvent (req, res, next) {
+  try {
+    logger.info(asyncHooks.getRequestContext(), req.params);
 
-  if (Number.isInteger(eventId)) {
-    getAllEvents(true).then(events => {
-      delete events[eventId];
-      saveEventsToFile(Object.values(events));
-      res.json({success: true});
-    });
-  } else {
-    res.json({error: 'invalid param'});
+    const eventId = Number(req.params.eventId);
+    const events = await getAllEvents(true)
+
+    delete events[eventId];
+    await saveEventsToFile(Object.values(events));
+    res.json({success: true});
+  } catch (err) {
+    next(err);
   }
 }
 
@@ -85,15 +58,20 @@ async function deleteEvent (req, res) {
 //    "hour": "13:00"
 // }'
 
-async function createEvent (req, res) {
-  const {id, title, location, date, hour} = req.body;
+async function createEvent (req, res, next) {
+  try {
+    const {id, title, location, date, hour} = req.body;
+    logger.info(asyncHooks.getRequestContext(), req.body);
 
-  getAllEvents().then(events => {
+    const events = await getAllEvents();
+
     events.push({id, title, location, date, hour});
-    saveEventsToFile(events);
+    await saveEventsToFile(events);
 
     res.json([{result: 'Event was added'}])
-  });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // curl --location --request PUT 'http://localhost:3000/events/3' \
@@ -105,27 +83,40 @@ async function createEvent (req, res) {
 //    "date": "12-12-2020",
 //    "hour": "13:00"
 // }'
-async function updateEvent (req, res) {
-  const {id, title, location, date, hour} = req.body;
-  const eventId = Number(req.params.eventId);
+async function updateEvent (req, res, next) {
+  try {
+    const {id, title, location, date, hour} = req.body;
+    const eventId = Number(req.params.eventId);
+    logger.info(asyncHooks.getRequestContext(), req.body, req.params);
 
-  getAllEvents(true).then(events => {
+    const events = await getAllEvents(true)
+
     if (events[eventId]) {
       events[eventId] = {id, title, location, date, hour};
-      saveEventsToFile(Object.values(events));
+      await saveEventsToFile(Object.values(events));
       res.json([{result: 'Event was updated'}])
     } else {
-      res.json({error: 'event not found'});
+      res.statusCode = 404;
+      res.json({error: 'Event not found'});
     }
-  });
+
+  } catch (err) {
+    next(err);
+  }
 }
 
 // curl localhost:3000/events-batch
-async function getEventsBatch (req, res) {
-  getAllEvents().then(events => {
+async function getEventsBatch (req, res, next) {
+  try {
+    logger.info(asyncHooks.getRequestContext());
+    const events = await getAllEvents();
+
     const streamEvents = stream.Readable.from(JSON.stringify(events));
     streamEvents.pipe(res);
-  });
+
+  } catch (err) {
+    next(err);
+  }
 }
 
 module.exports = {
