@@ -13,7 +13,12 @@ async function getEvents (req, res, next) {
     const location = req.query.location;
 
     const options = {
-      attributes: ['id', 'title', 'date', 'location', 'ownerId']
+      attributes: ['id', 'title', 'date', 'location', 'ownerId'],
+      include: [{
+        model: User,
+        as: 'participants',
+        attributes: ['firstName', 'lastName', 'email']
+      }]
     };
 
     if (location) {
@@ -23,6 +28,7 @@ async function getEvents (req, res, next) {
         }
       };
     }
+
     const events = await Event.findAll(options);
 
     res.json({results: events});
@@ -37,9 +43,18 @@ async function getEvent (req, res, next) {
     const eventId = Number(req.params.eventId);
     logger.info(asyncHooks.getRequestContext(), req.params);
 
-    const event = await Event.findByPk(eventId, {
-      attributes: ['id', 'title', 'date', 'location', 'ownerId']
+    const event = await Event.findOne({
+      where: {
+        id: eventId
+      },
+      attributes: ['id', 'title', 'date', 'location', 'ownerId'],
+      include: [{
+        model: User,
+        as: 'participants',
+        attributes: ['firstName', 'lastName', 'email']
+      }]
     });
+
     if (!event) res.status(404)
 
     res.json({results: event});

@@ -5,15 +5,15 @@ const {
 module.exports = (sequelize, DataTypes) => {
   class Event extends Model {
     static associate(models) {
-      // Event.belongsToMany(models.User, {
-      //   through: models.UserEvent,
-      //   as: 'participants',
-      //   foreignKey: 'eventId'
-      // })
-      // Event.belongsTo(models.User, {
-      //   as: 'owner',
-      //   foreignKey: 'ownerId'
-      // })
+      Event.belongsToMany(models.User, {
+        through: models.UserEvent,
+        as: 'participants',
+        foreignKey: 'eventId'
+      })
+      Event.belongsTo(models.User, {
+        as: 'owner',
+        foreignKey: 'ownerId'
+      })
     }
   }
 
