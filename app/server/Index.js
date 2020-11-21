@@ -10,7 +10,7 @@ const { logErrors, clientErrorHandler, errorHandler } = require('./helpers/error
 const app = express();
 
 app.use((req, res, next) => {
-  const data = { headers: req.headers, userId: 14};
+  const data = { headers: req.headers};
   asyncHooks.createRequestContext(data);
   next();
 });
@@ -30,13 +30,9 @@ app.delete('/events/:eventId', eventMethods.deleteEvent);
 app.post('/events', eventMethods.createEvent);
 app.put('/events/:eventId', eventMethods.updateEvent);
 
-// events
+// own and invited events
 app.get('/users/:userId/ownEvents', userEventsMethods.getUserOwnEvents);
 app.get('/users/:userId/invitedEvents', userEventsMethods.getUserInvitedEvents);
-// app.get('/events/:eventId', eventMethods.getEvent);
-// app.delete('/events/:eventId', eventMethods.deleteEvent);
-// app.post('/events', eventMethods.createEvent);
-// app.put('/events/:eventId', eventMethods.updateEvent);
 
 app.use(logErrors);
 app.use(clientErrorHandler);
