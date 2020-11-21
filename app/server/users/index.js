@@ -4,6 +4,7 @@ const logger = require('../helpers/logger');
 const db = require("../../db/models");
 const { Op } = require("sequelize");
 const User = db.User;
+const Event = db.Event;
 
 // curl localhost:3000/users?email=masalovych
 async function getUsers (req, res, next) {
@@ -48,15 +49,32 @@ async function getUser (req, res, next) {
 
 //  curl --request DELETE http://localhost:3000/users/3
 async function deleteUser (req, res, next) {
+  const t = await db.sequelize.transaction();
   try {
     logger.info(asyncHooks.getRequestContext(), req.params);
     const userId = Number(req.params.userId);
 
-    const deletedCount = await User.destroy({where: {id: userId}});
-    if (!deletedCount) return  res.status(404).json({error: 'not found'});
+    const user = await User.findByPk(userId);
 
-    res.json({success: true});
+    if (!user) return res.status(404).json({error: 'not found'});
+
+    // Destroy user events
+    const deletedEventsCount = await Event.destroy({
+      where: {
+        ownerId: userId,
+      },
+      transaction: t
+    })
+
+    await user.destroy({ transaction: t });
+
+    await t.commit();
+
+    res.json({success: true, results: {
+      message: `User and his ${deletedEventsCount} events ware deleted`
+    }});
   } catch (err) {
+    await t.rollback();
     next(err);
   }
 }
@@ -74,11 +92,19 @@ async function createUser (req, res, next) {
     logger.info(asyncHooks.getRequestContext(), req.body);
     const {firstName, lastName, email} = req.body;
 
-    const [user] = await User.findOrCreate({
+    const user = await User.findOne({
+      where: { email }
+    });
+
+    if (user) {
+      return res.status(400).json({error: `Email address ${email} already exist`});
+    }
+
+    const [newUser] = await User.findOrCreate({
       where: {firstName, lastName, email}
     })
 
-    res.json(user);
+    res.json(newUser);
   } catch (err) {
     next(err);
   }
@@ -90,7 +116,7 @@ async function createUser (req, res, next) {
 //    "id": 4,
 //    "firstName": "James2",
 //    "lastName": "Bond2",
-//    "email": "James2Bond2@gmail.com"
+//    "email": "BabaraLevy@gmail.com"
 // }'
 async function updateUser (req, res, next) {
   try {
@@ -98,16 +124,18 @@ async function updateUser (req, res, next) {
     const {firstName, lastName, email} = req.body;
     const userId = Number(req.params.userId);
 
-    const [updatedCount] = await User.update({
-      firstName, lastName, email
-    }, {
-      where: {
-        id: userId
-      }
-    });
-    if (!updatedCount) return res.status(404).json({error: 'not found'});
+    const user = await User.findByPk(userId);
 
-    res.json({success: true});
+    if (!user) return res.status(404).json({error: 'not found'});
+
+    if (user.email && user.email !== email) {
+      const sameEmailUser = await User.findOne({where: { email }});
+      if (sameEmailUser) return res.status(400).json({error: `Email address ${email} already exist`});
+    }
+
+    const updatedUser = await user.update({firstName, lastName, email});
+
+    res.json({success: true, results: updatedUser});
   } catch (err) {
     next(err);
   }
