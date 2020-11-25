@@ -1,19 +1,37 @@
-const stream = require('stream');
-const {getAllEvents, saveEventsToFile} = require('../helpers/csvDataHandlers');
 const asyncHooks = require('../hooks');
 const logger = require('../helpers/logger');
+
+const db = require("../../db/models");
+const { Op } = require("sequelize");
+const Event = db.Event;
+const User = db.User;
 
 // curl localhost:3000/events?location=lviv
 async function getEvents (req, res, next) {
   try {
-    const location = req.query.location;
-    let events = await getAllEvents();
-
     logger.info(asyncHooks.getRequestContext(), req.query);
+    const location = req.query.location;
+
+    const options = {
+      attributes: ['id', 'title', 'date', 'location', 'ownerId'],
+      include: [{
+        model: User,
+        as: 'participants',
+        attributes: ['firstName', 'lastName', 'email']
+      }]
+    };
+
     if (location) {
-      events = events.filter(event => event.location === location);
+      options.where = {
+        location: {
+          [Op.eq]: location
+        }
+      };
     }
-    res.json(events);
+
+    const events = await Event.findAll(options);
+
+    res.json({results: events});
   } catch (err) {
     next(err);
   }
@@ -25,8 +43,21 @@ async function getEvent (req, res, next) {
     const eventId = Number(req.params.eventId);
     logger.info(asyncHooks.getRequestContext(), req.params);
 
-    const events = await getAllEvents(true)
-    res.json(events[eventId]);
+    const event = await Event.findOne({
+      where: {
+        id: eventId
+      },
+      attributes: ['id', 'title', 'date', 'location', 'ownerId'],
+      include: [{
+        model: User,
+        as: 'participants',
+        attributes: ['firstName', 'lastName', 'email']
+      }]
+    });
+
+    if (!event) res.status(404)
+
+    res.json({results: event});
   } catch (err) {
     next(err);
   }
@@ -36,12 +67,11 @@ async function getEvent (req, res, next) {
 async function deleteEvent (req, res, next) {
   try {
     logger.info(asyncHooks.getRequestContext(), req.params);
-
     const eventId = Number(req.params.eventId);
-    const events = await getAllEvents(true)
 
-    delete events[eventId];
-    await saveEventsToFile(Object.values(events));
+    const deletedCount = await Event.destroy({where: {id: eventId}});
+    if (!deletedCount) return  res.status(404).json({error: 'not found'});
+
     res.json({success: true});
   } catch (err) {
     next(err);
@@ -51,24 +81,29 @@ async function deleteEvent (req, res, next) {
 // curl --request POST 'http://localhost:3000/events' \
 // --header 'Content-Type: application/json' \
 // --data-raw '{
-//    "id": 4,
 //    "title": "meeting4",
 //    "location": "dnepr",
 //    "date": "12-12-2020",
-//    "hour": "13:00"
+//    "ownerId": 16
 // }'
 
 async function createEvent (req, res, next) {
   try {
-    const {id, title, location, date, hour} = req.body;
     logger.info(asyncHooks.getRequestContext(), req.body);
+    const {title, location, date, ownerId} = req.body;
 
-    const events = await getAllEvents();
+    const owner = await User.findByPk(ownerId, {
+      attributes: ['id', 'email', 'firstName']
+    });
 
-    events.push({id, title, location, date, hour});
-    await saveEventsToFile(events);
-
-    res.json([{result: 'Event was added'}])
+    if (owner) {
+      const event = await Event.create({
+        title, location, date: new Date(date), ownerId
+      })
+      res.json({results: event});
+    } else {
+      res.status(400).json({error: 'Bad request parameters: Owner is not found'});
+    }
   } catch (err) {
     next(err);
   }
@@ -77,43 +112,27 @@ async function createEvent (req, res, next) {
 // curl --location --request PUT 'http://localhost:3000/events/3' \
 // --header 'Content-Type: application/json' \
 // --data-raw '{
-//    "id": 4,
-//    "title": "meeting4",
-//    "location": "dnepr",
-//    "date": "12-12-2020",
-//    "hour": "13:00"
+// "title": "meeting4",
+//   "location": "dnepr",
+//   "date": "12-12-2020",
+//   "ownerId": 16
 // }'
 async function updateEvent (req, res, next) {
   try {
-    const {id, title, location, date, hour} = req.body;
-    const eventId = Number(req.params.eventId);
     logger.info(asyncHooks.getRequestContext(), req.body, req.params);
+    const {title, location, date} = req.body;
+    const eventId = Number(req.params.eventId);
 
-    const events = await getAllEvents(true)
+    const [updatedCount] = await Event.update({
+      title, location, date: new Date(date)
+    }, {
+      where: {
+        id: eventId
+      }
+    });
+    if (!updatedCount) return res.status(404).json({error: 'events not found'});
 
-    if (events[eventId]) {
-      events[eventId] = {id, title, location, date, hour};
-      await saveEventsToFile(Object.values(events));
-      res.json([{result: 'Event was updated'}])
-    } else {
-      res.statusCode = 404;
-      res.json({error: 'Event not found'});
-    }
-
-  } catch (err) {
-    next(err);
-  }
-}
-
-// curl localhost:3000/events-batch
-async function getEventsBatch (req, res, next) {
-  try {
-    logger.info(asyncHooks.getRequestContext());
-    const events = await getAllEvents();
-
-    const streamEvents = stream.Readable.from(JSON.stringify(events));
-    streamEvents.pipe(res);
-
+    res.json({success: true});
   } catch (err) {
     next(err);
   }
@@ -124,6 +143,5 @@ module.exports = {
   getEvent,
   deleteEvent,
   createEvent,
-  updateEvent,
-  getEventsBatch
+  updateEvent
 };
