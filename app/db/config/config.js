@@ -4,15 +4,13 @@ const logger = require('../../server/helpers/logger');
 const logging = logger.info;
 require('dotenv').config();
 
-const _port = 3306;
-
 module.exports = {
   development: {
     username: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE_NAME,
     host: process.env.DATABASE_URL,
-    port: _port,
+    port: process.env.DATABASE_PORT,
     dialect: _dialect,
     logging,
     define: {
@@ -24,7 +22,7 @@ module.exports = {
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE_NAME,
     host: process.env.DATABASE_URL,
-    port: _port,
+    port: process.env.DATABASE_PORT,
     dialect: _dialect,
     logging,
     define: {
@@ -36,7 +34,7 @@ module.exports = {
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE_NAME,
     host: process.env.DATABASE_URL,
-    port: _port,
+    port: process.env.DATABASE_PORT,
     dialect: _dialect,
     logging,
     define: {
