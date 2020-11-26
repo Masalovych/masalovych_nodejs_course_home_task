@@ -19,11 +19,12 @@ app.use(bodyParser.json());
 
 //login
 app.post('/login', loginMethods.login);
-app.post('/refreshTokens', loginMethods.refreshTokens);
-app.post('/checkAccess', loginMethods.checkAccess);
+app.get('/refreshTokens', loginMethods.refreshTokens);
 
 // set user
 app.use(loginMethods.loginMiddleware);
+//check if token is valid
+app.get('/checkAccess', loginMethods.checkAccess);
 
 // users
 app.get('/users', usersMethods.getUsers);
