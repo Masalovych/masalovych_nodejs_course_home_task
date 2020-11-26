@@ -1,5 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const loginMethods = require('./login');
 const usersMethods = require('./users');
 const eventMethods = require('./events');
 const userEventsMethods = require('./userEvents');
@@ -15,6 +16,14 @@ app.use((req, res, next) => {
   next();
 });
 app.use(bodyParser.json());
+
+//login
+app.post('/login', loginMethods.login);
+app.post('/refreshTokens', loginMethods.refreshTokens);
+app.post('/checkAccess', loginMethods.checkAccess);
+
+// set user
+app.use(loginMethods.loginMiddleware);
 
 // users
 app.get('/users', usersMethods.getUsers);
