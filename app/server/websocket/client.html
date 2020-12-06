@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Web Socket</title>
+</head>
+<body>
+<h2>Websocket Client</h2>
+<script type="application/javascript">
+  (function() {
+    var ws = new WebSocket('ws://localhost:8080');
+    ws.onmessage = message => console.log('Incoming request: ', message.data);
+    ws.onclose = message => console.log('Connection closed: ', message);
+  })();
+</script>
+</body>
+</html>

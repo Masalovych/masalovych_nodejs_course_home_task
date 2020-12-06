@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Web Socket</title>
+</head>
+<body>
+<h2>Client Upload File</h2>
+
+<input type="button" value="Connect" onclick="connectToServer()"/>
+<br>
+<label for="filename">
+  Select some Image
+  <input type="file" id="filename" />
+</label>
+<br>
+<input type="button" value="Upload" onclick="sendFile()"/>
+
+<script type="application/javascript">
+  var ws;
+  function connectToServer() {
+    ws = new WebSocket('ws://localhost:8080');
+    ws.onmessage = evt => console.dir(evt.data);
+    ws.onopen = () => console.log("Connected.");
+    ws.onclose = (e) => console.dir(e);
+  }
+
+  function sendFile() {
+    ws.binaryType = "arraybuffer";
+    var file = document.getElementById('filename').files[0];
+    var reader = new FileReader();
+
+    reader.onloadend = function() {
+      ws.send(reader.result);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+</script>
+</body>
+</html>
